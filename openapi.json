@@ -1,5 +1,5 @@
 {
-  "openapi": "3.0.0",
+  "openapi": "3.1.0",
   "info": {
     "title": "IELTS Writing Feedback API",
     "version": "1.0.0",
@@ -14,6 +14,7 @@
   "paths": {
     "/submit-writing": {
       "post": {
+        "operationId": "submitWriting",
         "summary": "Submit a student's writing sample for analysis",
         "requestBody": {
           "required": true,
@@ -42,13 +43,24 @@
         },
         "responses": {
           "200": {
-            "description": "Writing submission received successfully"
+            "description": "Writing submission received successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
           }
         }
       }
     },
     "/get-feedback": {
       "get": {
+        "operationId": "getFeedback",
         "summary": "Get feedback for a submitted writing sample",
         "parameters": [
           {
@@ -92,6 +104,7 @@
     },
     "/stats": {
       "get": {
+        "operationId": "getStats",
         "summary": "Returns performance stats for a student",
         "parameters": [
           {
