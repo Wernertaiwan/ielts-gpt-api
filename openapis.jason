@@ -1,0 +1,139 @@
+{
+  "openapi": "3.1.0",
+  "info": {
+    "title": "IELTS Writing Feedback API",
+    "version": "1.0.0",
+    "description": "API for submitting writing tasks and receiving automated GPT-based feedback."
+  },
+  "servers": [
+    {
+      "url": "https://yourdomain.com/api",
+      "description": "Production Server"
+    }
+  ],
+  "paths": {
+    "/submit-writing": {
+      "post": {
+        "operationId": "submitWriting",
+        "summary": "Submit a student's writing sample for analysis",
+        "requestBody": {
+          "required": true,
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "properties": {
+                  "student_id": {
+                    "type": "string",
+                    "description": "An anonymized student identifier"
+                  },
+                  "task_type": {
+                    "type": "string",
+                    "enum": ["task1", "task2"]
+                  },
+                  "writing_text": {
+                    "type": "string",
+                    "description": "The student's writing"
+                  }
+                },
+                "required": ["student_id", "task_type", "writing_text"]
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Writing submission received successfully",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "message": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/get-feedback": {
+      "get": {
+        "operationId": "getFeedback",
+        "summary": "Get feedback for a submitted writing sample",
+        "parameters": [
+          {
+            "name": "student_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "submission_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Returns feedback including grammar, coherence, and vocabulary",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "band_estimate": { "type": "number" },
+                    "strengths": { "type": "string" },
+                    "areas_for_improvement": { "type": "string" },
+                    "grammar_comments": { "type": "string" },
+                    "coherence_comments": { "type": "string" },
+                    "vocabulary_comments": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    },
+    "/stats": {
+      "get": {
+        "operationId": "getStats",
+        "summary": "Returns performance stats for a student",
+        "parameters": [
+          {
+            "name": "student_id",
+            "in": "query",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Performance trends over time",
+            "content": {
+              "application/json": {
+                "schema": {
+                  "type": "object",
+                  "properties": {
+                    "average_band_score": { "type": "number" },
+                    "submission_count": { "type": "integer" },
+                    "improvement_graph_url": { "type": "string" }
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}
