@@ -1,8 +1,90 @@
 const Anthropic = require('@anthropic-ai/sdk');
+const fs   = require('fs');
+const path = require('path');
 const { writingRubrics, sentenceRubric, MIN_SCORE_FOR_MODEL_ANSWER } = require('../config/rubrics');
 
 const client = new Anthropic({ apiKey: process.env.ANTHROPIC_API_KEY });
 const MODEL = process.env.CLAUDE_MODEL || 'claude-sonnet-4-6';
+
+/* ── Scraped sample knowledge base ───────────────────────── */
+
+let _samples = null;
+
+function loadSamples() {
+  if (_samples !== null) return _samples;
+  const p = path.join(__dirname, '../knowledge/samples.json');
+  try {
+    _samples = JSON.parse(fs.readFileSync(p, 'utf8'));
+    console.log(`[calibration] Loaded ${_samples.length} writing samples from knowledge/samples.json`);
+  } catch {
+    _samples = [];
+  }
+  return _samples;
+}
+
+/**
+ * Pick up to `count` diverse examples from the knowledge base for the given
+ * task type. Aims for variety across band scores so Claude has clear anchors.
+ */
+function pickCalibrationExamples(taskType, count = 3) {
+  const samples = loadSamples().filter(s => s.taskType === taskType && s.text && s.text.length > 100);
+  if (!samples.length) return [];
+
+  // Partition into scored and unscored
+  const scored   = samples.filter(s => s.band != null).sort((a, b) => a.band - b.band);
+  const unscored = samples.filter(s => s.band == null);
+
+  const chosen = [];
+
+  if (scored.length >= 2) {
+    // Spread across the band range
+    const low  = scored[0];
+    const high = scored[scored.length - 1];
+    const mid  = scored[Math.floor(scored.length / 2)];
+    for (const s of [low, mid, high]) {
+      if (!chosen.includes(s)) chosen.push(s);
+      if (chosen.length >= count) break;
+    }
+  } else if (scored.length === 1) {
+    chosen.push(scored[0]);
+  }
+
+  // Fill remaining slots from unscored
+  for (const s of unscored) {
+    if (chosen.length >= count) break;
+    chosen.push(s);
+  }
+
+  return chosen.slice(0, count);
+}
+
+/**
+ * Build the "CALIBRATION EXAMPLES" section to inject into the system prompt.
+ * Truncates each essay to keep the prompt from growing too large.
+ */
+function buildCalibrationSection(taskType) {
+  const examples = pickCalibrationExamples(taskType, 3);
+  if (!examples.length) return '';
+
+  const lines = [
+    '',
+    '━━━ CALIBRATION EXAMPLES (real IELTS samples — use for scoring reference) ━━━',
+  ];
+
+  examples.forEach((ex, i) => {
+    const bandStr = ex.band != null ? ` | Band ${ex.band}` : '';
+    const wc      = ex.wordCount ? ` | ~${ex.wordCount} words` : '';
+    lines.push('');
+    lines.push(`--- Example ${i + 1}${bandStr}${wc} ---`);
+    if (ex.question) lines.push(`Question: ${ex.question.slice(0, 300)}`);
+    lines.push(`Writing:\n${ex.text.slice(0, 700)}${ex.text.length > 700 ? '…' : ''}`);
+  });
+
+  lines.push('━━━ END CALIBRATION EXAMPLES ━━━');
+  return lines.join('\n');
+}
+
+/* ── helpers ──────────────────────────────────────────────── */
 
 function buildRubricText(rubric) {
   return Object.values(rubric)
@@ -23,6 +105,8 @@ async function assessWriting({ taskType, question, writingText, modelAnswer }) {
   const firstCriterionKey = isTask1 ? 'taskAchievement' : 'taskResponse';
   const firstCriterionName = isTask1 ? 'Task Achievement' : 'Task Response';
 
+  const calibration = buildCalibrationSection(taskType);
+
   const systemPrompt = `You are a highly experienced IELTS examiner assessing IELTS Writing ${taskLabel} submissions.
 
 ABSOLUTE RULES — never violate these:
@@ -36,7 +120,7 @@ SCORING RUBRIC — IELTS Writing ${taskLabel}:
 ${rubricText}
 
 Band descriptors: 9=Expert | 7–8=Good | 5–6=Modest | 3–4=Limited | 1–2=Intermittent
-Overall band = mean of the four criterion scores, rounded to the nearest 0.5.
+Overall band = mean of the four criterion scores, rounded to the nearest 0.5.${calibration}
 
 Respond with ONLY valid JSON in this exact shape (no markdown, no extra text):
 {
