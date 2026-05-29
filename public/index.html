@@ -1,0 +1,218 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>IELTS Writing Assistant</title>
+  <link rel="stylesheet" href="style.css">
+</head>
+<body>
+
+  <header class="site-header">
+    <div class="container">
+      <div class="logo">
+        <div class="logo-icon">✍</div>
+        <div>
+          <h1>IELTS Writing Assistant</h1>
+          <p>AI-powered assessment &amp; feedback</p>
+        </div>
+      </div>
+    </div>
+  </header>
+
+  <main class="main">
+    <div class="container">
+
+      <!-- Tab navigation -->
+      <nav class="tab-nav" role="tablist">
+        <button class="tab-btn active" data-tab="writing" role="tab" aria-selected="true">
+          Writing Assessment
+        </button>
+        <button class="tab-btn" data-tab="sentence" role="tab" aria-selected="false">
+          Sentence Checker
+        </button>
+      </nav>
+
+      <!-- ======================== WRITING ASSESSMENT TAB ======================== -->
+      <div class="tab-panel active" id="tab-writing" role="tabpanel">
+
+        <!-- Teacher Setup Panel -->
+        <div class="teacher-panel" id="teacher-panel">
+          <button class="teacher-panel-toggle" id="teacher-toggle" aria-expanded="false">
+            <span class="teacher-toggle-label">
+              <span class="lock-icon">🔐</span>
+              Teacher Setup
+            </span>
+            <span class="teacher-toggle-chevron" id="teacher-chevron">▼</span>
+          </button>
+          <div class="teacher-panel-body" id="teacher-body" hidden>
+            <p class="notice notice-warning">
+              Configure the question and model answer below. Students who score <strong>Band 4 or above</strong> will automatically see the model answer after submission.
+            </p>
+            <div class="form-grid">
+              <div class="form-group">
+                <label for="task-type">Task Type</label>
+                <select id="task-type" class="form-control">
+                  <option value="task2">Task 2 — Essay</option>
+                  <option value="task1">Task 1 — Report / Letter</option>
+                </select>
+              </div>
+              <div class="form-group span-2">
+                <label for="question-input">Question / Prompt</label>
+                <textarea id="question-input" class="form-control" rows="3"
+                  placeholder="Paste the IELTS writing question here…"></textarea>
+              </div>
+              <div class="form-group span-2">
+                <label for="model-answer-input">Model Answer</label>
+                <textarea id="model-answer-input" class="form-control" rows="10"
+                  placeholder="Paste the model answer here. Students will only see this when they reach Band 4 or above…"></textarea>
+              </div>
+            </div>
+            <button class="btn btn-secondary" id="save-settings-btn">Save &amp; Close</button>
+          </div>
+        </div>
+
+        <!-- Student writing card -->
+        <div class="card" id="writing-card">
+          <div class="card-header">
+            <h2>Submit Your Writing</h2>
+            <span class="badge" id="task-badge">Task 2</span>
+          </div>
+
+          <div class="question-box" id="question-display" hidden>
+            <p class="question-label">Question</p>
+            <p id="question-text"></p>
+          </div>
+
+          <div class="form-group">
+            <label for="writing-input">Your Writing</label>
+            <textarea id="writing-input" class="form-control writing-area" rows="14"
+              placeholder="Type or paste your writing here, or upload a .txt file below…"></textarea>
+            <div class="writing-footer">
+              <span class="word-count">Words: <strong id="word-count">0</strong></span>
+              <label class="file-btn">
+                Upload .txt
+                <input type="file" id="file-upload" accept=".txt" aria-label="Upload text file">
+              </label>
+            </div>
+          </div>
+
+          <button class="btn btn-primary full-width" id="assess-btn">Assess My Writing</button>
+          <div id="assess-error" class="error-msg" hidden></div>
+        </div>
+
+        <!-- Writing results (hidden until assessment runs) -->
+        <section class="results" id="writing-results" hidden aria-live="polite">
+
+          <!-- Band score overview -->
+          <div class="card">
+            <h2>Assessment Results</h2>
+            <div class="score-overview">
+              <div class="band-circle" id="band-circle">
+                <span class="band-number" id="band-number">—</span>
+                <span class="band-label">Overall Band</span>
+              </div>
+              <div class="score-bars" id="score-bars"></div>
+            </div>
+          </div>
+
+          <!-- Per-criterion feedback -->
+          <div class="card">
+            <h2>Detailed Feedback</h2>
+            <div id="criterion-feedback"></div>
+          </div>
+
+          <!-- Strengths & Improvements -->
+          <div class="two-col">
+            <div class="card">
+              <h3 class="list-heading strengths-heading">Strengths</h3>
+              <ul class="feedback-list strengths" id="strengths-list"></ul>
+            </div>
+            <div class="card">
+              <h3 class="list-heading improve-heading">Areas to Improve</h3>
+              <ul class="feedback-list improve" id="improve-list"></ul>
+            </div>
+          </div>
+
+          <!-- Model answer — shown only when score >= 4 -->
+          <div class="card model-answer-card" id="model-answer-card" hidden>
+            <h2>Model Answer</h2>
+            <p class="model-answer-intro">
+              You have reached Band 4 or above. Here is a high-quality model answer for reference.
+              Use it to compare with your writing — do not copy it.
+            </p>
+            <div class="model-answer-body" id="model-answer-body"></div>
+          </div>
+
+          <!-- Encouragement — shown when score < 4 -->
+          <div class="card encouragement-card" id="encouragement-card" hidden>
+            <h2>Keep Practising!</h2>
+            <p>
+              You need to reach <strong>Band 4</strong> to unlock the model answer.
+              Study the feedback above, revise your writing, and submit again.
+            </p>
+          </div>
+
+        </section>
+      </div>
+
+      <!-- ======================== SENTENCE CHECKER TAB ======================== -->
+      <div class="tab-panel" id="tab-sentence" role="tabpanel" hidden>
+
+        <div class="card">
+          <div class="card-header">
+            <h2>Grammar &amp; IELTS Sentence Checker</h2>
+          </div>
+          <p class="section-desc">
+            Type one or more sentences to check grammar accuracy and IELTS academic readiness.
+            You will receive targeted hints — the tool will never give you the corrected sentence.
+          </p>
+          <div class="form-group">
+            <label for="sentence-input">Your Sentence(s)</label>
+            <textarea id="sentence-input" class="form-control" rows="4"
+              placeholder="e.g. The government should investing more money in public transport because it help reduce traffic."></textarea>
+          </div>
+          <button class="btn btn-primary full-width" id="check-btn">Check Sentence</button>
+          <div id="sentence-error" class="error-msg" hidden></div>
+        </div>
+
+        <!-- Sentence results -->
+        <section class="results" id="sentence-results" hidden aria-live="polite">
+
+          <div class="card">
+            <h2>Sentence Analysis</h2>
+            <div class="sentence-score-grid" id="sentence-score-grid"></div>
+            <div id="level-badge-wrap"></div>
+          </div>
+
+          <div class="two-col">
+            <div class="card">
+              <h3 class="list-heading error-heading">Errors &amp; Hints</h3>
+              <div id="error-list"></div>
+            </div>
+            <div class="card">
+              <h3 class="list-heading improve-heading">Suggestions</h3>
+              <ul class="feedback-list improve" id="sentence-suggestions"></ul>
+            </div>
+          </div>
+
+          <div class="card" id="sentence-strengths-card">
+            <h3 class="list-heading strengths-heading">What's Good</h3>
+            <ul class="feedback-list strengths" id="sentence-strengths"></ul>
+          </div>
+
+        </section>
+      </div>
+
+    </div><!-- /container -->
+  </main>
+
+  <footer class="site-footer">
+    <div class="container">
+      <p>IELTS Writing Assistant &mdash; powered by Claude AI</p>
+    </div>
+  </footer>
+
+  <script src="app.js"></script>
+</body>
+</html>
