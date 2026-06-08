@@ -31,6 +31,9 @@
         <button class="tab-btn" data-tab="sentence" role="tab" aria-selected="false">
           Sentence Checker
         </button>
+        <button class="tab-btn" data-tab="nutrition" role="tab" aria-selected="false">
+          Nutrition Tracker
+        </button>
       </nav>
 
       <!-- ======================== WRITING ASSESSMENT TAB ======================== -->
@@ -202,6 +205,114 @@
           </div>
 
         </section>
+      </div>
+
+      <!-- ======================== NUTRITION TRACKER TAB ======================== -->
+      <div class="tab-panel" id="tab-nutrition" role="tabpanel" hidden>
+
+        <!-- Daily macro summary -->
+        <div class="card">
+          <div class="card-header">
+            <h2>Today's Macros</h2>
+            <span class="badge" id="today-date"></span>
+          </div>
+          <div class="macro-grid">
+            <div class="macro-card macro-cal">
+              <span class="macro-value" id="total-calories">0</span>
+              <span class="macro-label">Calories</span>
+              <span class="macro-unit">kcal</span>
+            </div>
+            <div class="macro-card macro-protein">
+              <span class="macro-value" id="total-protein">0</span>
+              <span class="macro-label">Protein</span>
+              <span class="macro-unit">g</span>
+            </div>
+            <div class="macro-card macro-carbs">
+              <span class="macro-value" id="total-carbs">0</span>
+              <span class="macro-label">Carbs</span>
+              <span class="macro-unit">g</span>
+            </div>
+            <div class="macro-card macro-fat">
+              <span class="macro-value" id="total-fat">0</span>
+              <span class="macro-label">Fat</span>
+              <span class="macro-unit">g</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- Scanner card -->
+        <div class="card">
+          <div class="card-header">
+            <h2>Scan Nutrition Label</h2>
+          </div>
+          <p class="section-desc">
+            Take a photo or upload an image of any nutrition label.
+            Works with Taiwan labels written in Chinese (繁體中文).
+          </p>
+
+          <!-- Image drop zone / preview -->
+          <div class="scan-zone" id="scan-zone">
+            <div class="scan-placeholder" id="scan-placeholder">
+              <div class="scan-icon">📷</div>
+              <p class="scan-hint">Take a photo or select an image</p>
+              <label class="btn btn-primary">
+                Choose Photo
+                <input type="file" id="label-image" accept="image/*" capture="environment"
+                  aria-label="Upload nutrition label photo">
+              </label>
+            </div>
+            <div class="scan-preview-wrap" id="scan-preview-wrap" hidden>
+              <img id="scan-preview" class="scan-preview" alt="Nutrition label preview">
+              <label class="scan-change-btn">
+                Change Photo
+                <input type="file" id="label-image-retry" accept="image/*" capture="environment"
+                  aria-label="Choose different photo">
+              </label>
+            </div>
+          </div>
+
+          <div id="nutrition-error" class="error-msg" hidden></div>
+
+          <!-- Parsed result -->
+          <div id="scan-result" hidden>
+            <div class="scan-result-header">
+              <div>
+                <h3 id="result-product-name" class="result-name"></h3>
+                <p id="result-original-name" class="result-original-name"></p>
+              </div>
+              <span class="confidence-badge" id="confidence-badge"></span>
+            </div>
+            <p class="result-serving-info" id="result-serving-info"></p>
+
+            <div class="nutrition-facts-box">
+              <div class="nf-title">Nutrition Facts — Per Serving</div>
+              <div class="nf-rows" id="nf-rows"></div>
+            </div>
+
+            <div class="serving-adjust">
+              <span class="serving-label">Servings eaten:</span>
+              <div class="serving-control">
+                <button class="serving-btn" id="serving-minus" aria-label="Decrease servings">−</button>
+                <span class="serving-count" id="serving-count">1</span>
+                <button class="serving-btn" id="serving-plus" aria-label="Increase servings">+</button>
+              </div>
+            </div>
+
+            <button class="btn btn-primary full-width" id="add-to-log-btn">Add to Daily Log</button>
+          </div>
+        </div>
+
+        <!-- Daily log list -->
+        <div class="card">
+          <div class="card-header">
+            <h2>Today's Log</h2>
+            <button class="btn btn-secondary btn-sm" id="clear-log-btn">Clear Day</button>
+          </div>
+          <div id="daily-log-list">
+            <p class="empty-log">No items logged yet. Scan a label to get started.</p>
+          </div>
+        </div>
+
       </div>
 
     </div><!-- /container -->
