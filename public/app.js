@@ -311,6 +311,288 @@ function renderSentenceResults(data) {
 }
 
 /* ============================================================
+   Nutrition Tracker
+   ============================================================ */
+
+/* ── Daily log (localStorage) ─────────────────────────────── */
+
+const LOG_KEY = 'nutrition_daily_log';
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10); // YYYY-MM-DD
+}
+
+function loadDailyLog() {
+  try {
+    const raw = localStorage.getItem(LOG_KEY);
+    if (!raw) return { date: todayStr(), items: [] };
+    const log = JSON.parse(raw);
+    if (log.date !== todayStr()) return { date: todayStr(), items: [] }; // reset for new day
+    return log;
+  } catch {
+    return { date: todayStr(), items: [] };
+  }
+}
+
+function saveDailyLog(log) {
+  localStorage.setItem(LOG_KEY, JSON.stringify(log));
+}
+
+/* ── Macro totals display ──────────────────────────────────── */
+
+function updateMacroTotals() {
+  const log = loadDailyLog();
+  const totals = log.items.reduce((acc, item) => {
+    acc.calories += item.calories || 0;
+    acc.protein  += item.protein  || 0;
+    acc.carbs    += item.carbs    || 0;
+    acc.fat      += item.fat      || 0;
+    return acc;
+  }, { calories: 0, protein: 0, carbs: 0, fat: 0 });
+
+  document.getElementById('total-calories').textContent = Math.round(totals.calories);
+  document.getElementById('total-protein').textContent  = totals.protein.toFixed(1);
+  document.getElementById('total-carbs').textContent    = totals.carbs.toFixed(1);
+  document.getElementById('total-fat').textContent      = totals.fat.toFixed(1);
+}
+
+/* ── Log list rendering ───────────────────────────────────── */
+
+function renderLogList() {
+  const log = loadDailyLog();
+  const container = document.getElementById('daily-log-list');
+  if (log.items.length === 0) {
+    container.innerHTML = '<p class="empty-log">No items logged yet. Scan a label to get started.</p>';
+    return;
+  }
+  container.innerHTML = log.items.map(item => `
+    <div class="log-item" data-id="${escHtml(item.id)}">
+      <div class="log-item-info">
+        <span class="log-item-name">${escHtml(item.productName)}</span>
+        <span class="log-item-serving">${escHtml(item.servingDesc)}</span>
+      </div>
+      <div class="log-item-macros">
+        <span class="log-macro log-cal">${Math.round(item.calories)} kcal</span>
+        <span class="log-macro log-p">P: ${item.protein.toFixed(1)}g</span>
+        <span class="log-macro log-c">C: ${item.carbs.toFixed(1)}g</span>
+        <span class="log-macro log-f">F: ${item.fat.toFixed(1)}g</span>
+      </div>
+      <button class="log-remove-btn" data-id="${escHtml(item.id)}" aria-label="Remove item">✕</button>
+    </div>`).join('');
+
+  container.querySelectorAll('.log-remove-btn').forEach(btn => {
+    btn.addEventListener('click', () => removeLogItem(btn.dataset.id));
+  });
+}
+
+function removeLogItem(id) {
+  const log = loadDailyLog();
+  log.items = log.items.filter(i => i.id !== id);
+  saveDailyLog(log);
+  updateMacroTotals();
+  renderLogList();
+}
+
+/* ── Image handling ───────────────────────────────────────── */
+
+let _scannedData = null;
+
+function compressImage(file) {
+  return new Promise((resolve) => {
+    const reader = new FileReader();
+    reader.onload = ev => {
+      const img = new Image();
+      img.onload = () => {
+        const MAX = 1600;
+        let w = img.width;
+        let h = img.height;
+        if (w > MAX || h > MAX) {
+          const ratio = Math.min(MAX / w, MAX / h);
+          w = Math.round(w * ratio);
+          h = Math.round(h * ratio);
+        }
+        const canvas = document.createElement('canvas');
+        canvas.width  = w;
+        canvas.height = h;
+        canvas.getContext('2d').drawImage(img, 0, 0, w, h);
+        const dataUrl = canvas.toDataURL('image/jpeg', 0.85);
+        const base64 = dataUrl.split(',')[1];
+        resolve({ base64, mimeType: 'image/jpeg' });
+      };
+      img.src = ev.target.result;
+    };
+    reader.readAsDataURL(file);
+  });
+}
+
+function showImagePreview(file) {
+  const url = URL.createObjectURL(file);
+  document.getElementById('scan-preview').src = url;
+  document.getElementById('scan-placeholder').hidden = true;
+  document.getElementById('scan-preview-wrap').hidden = false;
+}
+
+/* ── Scanning ─────────────────────────────────────────────── */
+
+async function handleImageSelected(file) {
+  if (!file) return;
+  hideError('nutrition-error');
+  document.getElementById('scan-result').hidden = true;
+
+  showImagePreview(file);
+
+  const scanBtn = document.getElementById('add-to-log-btn');
+  const zone = document.getElementById('scan-zone');
+  zone.classList.add('scan-loading');
+
+  try {
+    const { base64, mimeType } = await compressImage(file);
+
+    const res = await fetch('/api/nutrition/scan', {
+      method:  'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ image: base64, mimeType }),
+    });
+
+    const data = await res.json();
+    if (!res.ok) throw new Error(data.error || 'Scan failed.');
+
+    _scannedData = data;
+    renderScanResult(data);
+    document.getElementById('scan-result').hidden = false;
+    document.getElementById('scan-result').scrollIntoView({ behavior: 'smooth', block: 'nearest' });
+  } catch (err) {
+    showError('nutrition-error', err.message);
+  } finally {
+    zone.classList.remove('scan-loading');
+  }
+}
+
+function renderScanResult(data) {
+  document.getElementById('result-product-name').textContent = data.productName || 'Unknown Product';
+  const origEl = document.getElementById('result-original-name');
+  if (data.originalName) {
+    origEl.textContent = data.originalName;
+    origEl.hidden = false;
+  } else {
+    origEl.hidden = true;
+  }
+
+  const servingParts = [data.servingSize];
+  if (data.servingsPerPackage) servingParts.push(`${data.servingsPerPackage} servings per package`);
+  document.getElementById('result-serving-info').textContent = servingParts.join(' · ');
+
+  const badge = document.getElementById('confidence-badge');
+  badge.textContent = data.confidence ? data.confidence.toUpperCase() : '';
+  badge.className = 'confidence-badge confidence-' + (data.confidence || 'low');
+
+  const p = data.perServing || {};
+  const nfRows = [
+    { label: 'Calories',           value: p.calories,          unit: 'kcal', bold: true },
+    { label: 'Protein',            value: p.protein,           unit: 'g' },
+    { label: 'Total Carbohydrate', value: p.totalCarbohydrate, unit: 'g' },
+    { label: '— Sugar',            value: p.sugar,             unit: 'g', sub: true },
+    { label: '— Dietary Fiber',    value: p.dietaryFiber,      unit: 'g', sub: true },
+    { label: 'Total Fat',          value: p.totalFat,          unit: 'g' },
+    { label: '— Saturated Fat',    value: p.saturatedFat,      unit: 'g', sub: true },
+    { label: '— Trans Fat',        value: p.transFat,          unit: 'g', sub: true },
+    { label: 'Sodium',             value: p.sodium,            unit: 'mg' },
+  ].filter(r => r.value != null);
+
+  document.getElementById('nf-rows').innerHTML = nfRows.map(r => `
+    <div class="nf-row${r.sub ? ' nf-sub' : ''}${r.bold ? ' nf-bold' : ''}">
+      <span>${escHtml(r.label)}</span>
+      <span>${r.value}${escHtml(r.unit)}</span>
+    </div>`).join('');
+
+  document.getElementById('serving-count').textContent = '1';
+}
+
+document.getElementById('label-image').addEventListener('change', e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (file) handleImageSelected(file);
+});
+
+document.getElementById('label-image-retry').addEventListener('change', e => {
+  const file = e.target.files[0];
+  e.target.value = '';
+  if (file) handleImageSelected(file);
+});
+
+/* ── Serving count controls ───────────────────────────────── */
+
+let _servings = 1;
+
+document.getElementById('serving-minus').addEventListener('click', () => {
+  if (_servings > 0.5) {
+    _servings = Math.round((_servings - 0.5) * 10) / 10;
+    document.getElementById('serving-count').textContent = _servings;
+  }
+});
+
+document.getElementById('serving-plus').addEventListener('click', () => {
+  _servings = Math.round((_servings + 0.5) * 10) / 10;
+  document.getElementById('serving-count').textContent = _servings;
+});
+
+/* ── Add to log ───────────────────────────────────────────── */
+
+document.getElementById('add-to-log-btn').addEventListener('click', () => {
+  if (!_scannedData) return;
+
+  const p = _scannedData.perServing || {};
+  const s = _servings;
+  const servingDesc = s === 1
+    ? _scannedData.servingSize || '1 serving'
+    : `${s} × ${_scannedData.servingSize || 'serving'}`;
+
+  const item = {
+    id:          Date.now().toString(36) + Math.random().toString(36).slice(2),
+    timestamp:   new Date().toISOString(),
+    productName: _scannedData.productName || 'Unknown',
+    servingDesc,
+    calories: (p.calories          || 0) * s,
+    protein:  (p.protein           || 0) * s,
+    carbs:    (p.totalCarbohydrate || 0) * s,
+    fat:      (p.totalFat          || 0) * s,
+  };
+
+  const log = loadDailyLog();
+  log.items.push(item);
+  saveDailyLog(log);
+
+  updateMacroTotals();
+  renderLogList();
+
+  // reset scanner UI
+  _scannedData = null;
+  _servings = 1;
+  document.getElementById('scan-result').hidden = true;
+  document.getElementById('scan-placeholder').hidden = false;
+  document.getElementById('scan-preview-wrap').hidden = true;
+  hideError('nutrition-error');
+});
+
+/* ── Clear day ────────────────────────────────────────────── */
+
+document.getElementById('clear-log-btn').addEventListener('click', () => {
+  if (!confirm('Clear all items from today\'s log?')) return;
+  saveDailyLog({ date: todayStr(), items: [] });
+  updateMacroTotals();
+  renderLogList();
+});
+
+/* ── Init on load ─────────────────────────────────────────── */
+
+document.getElementById('today-date').textContent = new Date().toLocaleDateString('en-US', {
+  weekday: 'short', month: 'short', day: 'numeric',
+});
+
+updateMacroTotals();
+renderLogList();
+
+/* ============================================================
    Helpers
    ============================================================ */
 function setLoading(btn, text) {
